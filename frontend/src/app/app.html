@@ -1,0 +1,313 @@
+<main class="planner-shell">
+  <header class="app-header">
+    <div>
+      <p class="eyebrow">Ruby + Angular + PostgreSQL</p>
+      <h1>Recipe & Meal Planner</h1>
+      <p class="lede">
+        Build a recipe library, schedule the week, and let Rails assemble the shopping list from your planned meals.
+      </p>
+    </div>
+
+    <dl class="stats" aria-label="Planner summary">
+      <div>
+        <dt>Recipes</dt>
+        <dd>{{ totalRecipes() }}</dd>
+      </div>
+      <div>
+        <dt>Planned</dt>
+        <dd>{{ plannedMealCount() }}</dd>
+      </div>
+      <div>
+        <dt>Items</dt>
+        <dd>{{ shoppingItemCount() }}</dd>
+      </div>
+    </dl>
+  </header>
+
+  @if (error()) {
+    <p class="message error">{{ error() }}</p>
+  }
+
+  @if (notice()) {
+    <p class="message notice">{{ notice() }}</p>
+  }
+
+  @if (loading()) {
+    <section class="loading-panel">
+      <p>Loading your kitchen workspace...</p>
+    </section>
+  } @else {
+    <section class="workspace">
+      <form class="recipe-editor panel" (ngSubmit)="saveRecipe()">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Recipe library</p>
+            <h2>{{ recipeForm.id ? 'Edit recipe' : 'Create recipe' }}</h2>
+          </div>
+          <button class="ghost-button" type="button" (click)="resetRecipeForm()">Clear</button>
+        </div>
+
+        <label>
+          <span>Recipe name</span>
+          <input name="title" type="text" [(ngModel)]="recipeForm.title" placeholder="Miso salmon rice bowls" />
+        </label>
+
+        <label>
+          <span>Description</span>
+          <textarea
+            name="description"
+            rows="3"
+            [(ngModel)]="recipeForm.description"
+            placeholder="A quick note about flavor, prep, or why this belongs in the rotation"
+          ></textarea>
+        </label>
+
+        <div class="field-grid">
+          <label>
+            <span>Category</span>
+            <input name="category" type="text" [(ngModel)]="recipeForm.category" />
+          </label>
+
+          <label>
+            <span>Servings</span>
+            <input name="servings" type="number" min="1" [(ngModel)]="recipeForm.servings" />
+          </label>
+
+          <label>
+            <span>Prep min</span>
+            <input name="prep" type="number" min="0" [(ngModel)]="recipeForm.prep_time_minutes" />
+          </label>
+
+          <label>
+            <span>Cook min</span>
+            <input name="cook" type="number" min="0" [(ngModel)]="recipeForm.cook_time_minutes" />
+          </label>
+        </div>
+
+        <div class="ingredient-header">
+          <h3>Ingredients</h3>
+          <button class="ghost-button" type="button" (click)="addIngredient()">Add ingredient</button>
+        </div>
+
+        <div class="ingredient-list">
+          @for (ingredient of recipeForm.ingredients; track $index) {
+            <div class="ingredient-row">
+              <input
+                name="ingredient-name-{{ $index }}"
+                type="text"
+                [(ngModel)]="ingredient.name"
+                placeholder="Ingredient"
+              />
+              <input
+                name="ingredient-quantity-{{ $index }}"
+                type="number"
+                min="0.01"
+                step="0.01"
+                [(ngModel)]="ingredient.quantity"
+                placeholder="Qty"
+              />
+              <input
+                name="ingredient-unit-{{ $index }}"
+                type="text"
+                [(ngModel)]="ingredient.unit"
+                placeholder="Unit"
+              />
+              <input
+                name="ingredient-calories-{{ $index }}"
+                type="number"
+                min="0"
+                step="1"
+                [(ngModel)]="ingredient.calories"
+                placeholder="Cal"
+              />
+              <input
+                name="ingredient-protein-{{ $index }}"
+                type="number"
+                min="0"
+                step="0.1"
+                [(ngModel)]="ingredient.protein_grams"
+                placeholder="Protein"
+              />
+              <input
+                name="ingredient-carbs-{{ $index }}"
+                type="number"
+                min="0"
+                step="0.1"
+                [(ngModel)]="ingredient.carbs_grams"
+                placeholder="Carbs"
+              />
+              <input
+                name="ingredient-fat-{{ $index }}"
+                type="number"
+                min="0"
+                step="0.1"
+                [(ngModel)]="ingredient.fat_grams"
+                placeholder="Fat"
+              />
+              <button class="icon-button" type="button" title="Remove ingredient" (click)="removeIngredient($index)">X</button>
+            </div>
+          }
+        </div>
+
+        <button class="primary-button" type="submit">
+          {{ recipeForm.id ? 'Save changes' : 'Save recipe' }}
+        </button>
+      </form>
+
+      <section class="panel recipe-list">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Cookbook</p>
+            <h2>Saved recipes</h2>
+          </div>
+        </div>
+
+        <div class="recipe-stack">
+          @for (recipe of recipes(); track recipe.id) {
+            <article class="recipe-card">
+              <div>
+                <p class="recipe-category">{{ recipe.category }}</p>
+                <h3>{{ recipe.title }}</h3>
+                <p>{{ recipe.description || 'No description yet.' }}</p>
+              </div>
+
+              <div class="recipe-meta">
+                <span>{{ totalMinutes(recipe) }} min</span>
+                <span>{{ recipe.servings }} servings</span>
+                <span>{{ recipe.ingredients.length }} ingredients</span>
+              </div>
+
+              <dl class="macro-grid" aria-label="Recipe macros">
+                @for (macro of macroItems(recipe.macros); track macro.label) {
+                  <div>
+                    <dt>{{ macro.label }}</dt>
+                    <dd>{{ macro.value }}</dd>
+                  </div>
+                }
+              </dl>
+
+              <ul class="mini-ingredients">
+                @for (ingredient of recipe.ingredients.slice(0, 4); track ingredient.id || ingredient.name) {
+                  <li>{{ formatQuantity(ingredient.quantity) }} {{ ingredient.unit }} {{ ingredient.name }}</li>
+                }
+              </ul>
+
+              <div class="card-actions">
+                <button class="ghost-button" type="button" (click)="editRecipe(recipe)">Edit</button>
+                <button class="text-button danger" type="button" (click)="deleteRecipe(recipe.id)">Delete</button>
+              </div>
+            </article>
+          } @empty {
+            <p class="empty-state">Create your first recipe to start planning meals.</p>
+          }
+        </div>
+      </section>
+    </section>
+
+    <section class="planner-grid">
+      <form class="panel meal-form" (ngSubmit)="planMeal()">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Weekly plan</p>
+            <h2>Schedule a meal</h2>
+          </div>
+        </div>
+
+        <label>
+          <span>Recipe</span>
+          <select name="plan-recipe" [(ngModel)]="mealPlanForm.recipe_id">
+            @for (recipe of recipes(); track recipe.id) {
+              <option [ngValue]="recipe.id">{{ recipe.title }}</option>
+            }
+          </select>
+        </label>
+
+        <div class="field-grid compact">
+          <label>
+            <span>Date</span>
+            <input name="plan-date" type="date" [(ngModel)]="mealPlanForm.planned_on" />
+          </label>
+
+          <label>
+            <span>Meal</span>
+            <select name="plan-meal-type" [(ngModel)]="mealPlanForm.meal_type">
+              @for (mealType of mealTypes; track mealType) {
+                <option [value]="mealType">{{ mealType }}</option>
+              }
+            </select>
+          </label>
+
+          <label>
+            <span>Servings</span>
+            <input name="plan-servings" type="number" min="1" [(ngModel)]="mealPlanForm.servings" />
+          </label>
+        </div>
+
+        <label>
+          <span>Notes</span>
+          <input name="plan-notes" type="text" [(ngModel)]="mealPlanForm.notes" placeholder="Prep ahead, leftovers, guests" />
+        </label>
+
+        <button class="primary-button" type="submit">Add to planner</button>
+      </form>
+
+      <section class="panel week-board">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Next 7 days</p>
+            <h2>Meal calendar</h2>
+          </div>
+        </div>
+
+        <div class="day-grid">
+          @for (day of weekDays; track day) {
+            <article class="day-column">
+              <h3>{{ formatDay(day) }}</h3>
+              @for (mealPlan of plansForDay(day); track mealPlan.id) {
+                <div class="meal-chip">
+                  <div>
+                    <strong>{{ mealPlan.meal_type }}</strong>
+                    <span>{{ mealPlan.recipe.title }}</span>
+                    <small>{{ mealPlan.servings }} servings</small>
+                    <dl class="meal-macros" aria-label="Meal macros">
+                      @for (macro of macroItems(mealPlan.macros); track macro.label) {
+                        <div>
+                          <dt>{{ macro.label }}</dt>
+                          <dd>{{ macro.value }}</dd>
+                        </div>
+                      }
+                    </dl>
+                  </div>
+                  <button class="icon-button" type="button" title="Remove meal" (click)="deleteMealPlan(mealPlan.id)">X</button>
+                </div>
+              } @empty {
+                <p class="quiet">Open</p>
+              }
+            </article>
+          }
+        </div>
+      </section>
+
+      <section class="panel shopping-list">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">From planned meals</p>
+            <h2>Shopping list</h2>
+          </div>
+          <button class="ghost-button" type="button" (click)="loadPlanner()">Refresh</button>
+        </div>
+
+        <ul>
+          @for (item of shoppingList(); track item.name + item.unit) {
+            <li>
+              <span>{{ item.name }}</span>
+              <strong>{{ formatQuantity(item.quantity) }} {{ item.unit }}</strong>
+            </li>
+          } @empty {
+            <li class="empty-state">Plan meals to generate a list.</li>
+          }
+        </ul>
+      </section>
+    </section>
+  }
+</main>
